@@ -12,6 +12,7 @@ export type ChatTurn = {
   reply: string;
   userAgent?: string | null;
   askedAt: Date; // thời điểm khách gửi câu hỏi
+  repliedAt: Date; // thời điểm chatbot trả lời (không dùng giờ ghi DB, vì ghi chạy sau khi đã phản hồi)
 };
 
 let warnedMissingEnv = false;
@@ -59,7 +60,7 @@ export async function saveChatTurn(turn: ChatTurn): Promise<void> {
         visitor_id: turn.visitorId,
         role: "assistant",
         content: turn.reply,
-        created_at: new Date().toISOString(),
+        created_at: turn.repliedAt.toISOString(),
       },
     ]);
     if (inserted.error) throw inserted.error;

@@ -109,7 +109,8 @@ export async function POST(request: NextRequest) {
     if (visitorId && conversationId) {
       const userText = messages[messages.length - 1].content;
       const userAgent = request.headers.get("user-agent");
-      after(() => saveChatTurn({ conversationId, visitorId, userText, reply, userAgent, askedAt }));
+      const repliedAt = new Date();
+      after(() => saveChatTurn({ conversationId, visitorId, userText, reply, userAgent, askedAt, repliedAt }));
     }
 
     return Response.json({ reply });

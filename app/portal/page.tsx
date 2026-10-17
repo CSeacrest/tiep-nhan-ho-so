@@ -1,13 +1,42 @@
-import { FileText, IdCard, LogOut, Medal } from "lucide-react";
+import { cookies } from "next/headers";
+import { LogOut } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
-import { DocumentFeatures } from "@/components/portal/document-features";
+import { DocumentUploader, type UploadSlot } from "@/components/portal/document-uploader";
 import { ExtractedInfo } from "@/components/portal/extracted-info";
 import { SchoolMatch } from "@/components/portal/school-match";
-import { currentStudent } from "@/lib/mock-data";
+import { UUID_RE } from "@/lib/chat-log";
+import { getReferenceSchools } from "@/lib/reference-schools";
+import { PROFILE_COOKIE, getProfileDocuments, type StoredDocument } from "@/lib/student-profile";
 
-export default function PortalPage() {
-  const { documents, extracted, matches } = currentStudent;
+// Dữ liệu riêng của từng học viên (theo cookie) nên luôn render mới ở server
+export const dynamic = "force-dynamic";
+
+function slot(
+  base: Pick<UploadSlot, "kind" | "title" | "accept" | "mimes">,
+  doc: StoredDocument | undefined,
+): UploadSlot {
+  return { ...base, fileName: doc?.fileName, status: doc?.status ?? "chua_nop", reason: doc?.reason };
+}
+
+export default async function PortalPage() {
+  const profileId = (await cookies()).get(PROFILE_COOKIE)?.value;
+  const docs = profileId && UUID_RE.test(profileId) ? await getProfileDocuments(profileId.toLowerCase()) : {};
+
+  const name = docs.identity?.extracted?.fullName ?? docs.transcript?.extracted?.fullName ?? docs.ielts?.extracted?.fullName;
+
+  // Đối chiếu điểm chuẩn chỉ khi cả hai giấy tờ hợp lệ; điểm học tập của các trường tính theo thang 10
+  const gpa = docs.transcript?.status === "hop_le" ? docs.transcript.extracted : null;
+  const ielts = docs.ielts?.status === "hop_le" ? docs.ielts.extracted?.overall : null;
+  const gpaOn10 = gpa?.gpa != null && (gpa.gpaScale == null || gpa.gpaScale === 10) ? gpa.gpa : null;
+  const matches =
+    gpaOn10 != null && ielts != null
+      ? (await getReferenceSchools()).map((school) => ({
+          school,
+          passed: gpaOn10 >= school.minGpa && ielts >= school.minIelts,
+        }))
+      : [];
+  const gpaNote = gpa?.gpa != null && gpaOn10 == null;
 
   return (
     <>
@@ -16,7 +45,7 @@ export default function PortalPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-6">
           <div>
             <p className="text-sm text-muted-foreground">Xin chào,</p>
-            <h1 className="text-2xl font-medium tracking-tight">{currentStudent.name}</h1>
+            <h1 className="text-2xl font-medium tracking-tight">{name ?? "Học viên mới"}</h1>
           </div>
           <Button variant="outline">
             <LogOut className="size-4" />
@@ -31,30 +60,25 @@ export default function PortalPage() {
           </p>
 
           <div className="mt-6">
-            <DocumentFeatures
-              items={[
-                {
-                  icon: FileText,
-                  title: "Bảng điểm (PDF)",
-                  accept: "Chấp nhận PDF",
-                  fileName: documents.transcript.fileName,
-                  status: documents.transcript.status,
-                },
-                {
-                  icon: Medal,
-                  title: "Ảnh chứng chỉ IELTS",
-                  accept: "Chấp nhận JPG, PNG",
-                  fileName: documents.ielts.fileName,
-                  status: documents.ielts.status,
-                },
-                {
-                  icon: IdCard,
-                  title: "Ảnh CMND/CCCD hoặc hộ chiếu",
-                  accept: "Chấp nhận JPG, PNG",
-                  fileName: documents.identity.fileName,
-                  status: documents.identity.status,
-                  reason: documents.identity.reason,
-                },
+            <DocumentUploader
+              slots={[
+                slot(
+                  { kind: "transcript", title: "Bảng điểm (PDF)", accept: "Chấp nhận PDF, tối đa 8 MB", mimes: "application/pdf" },
+                  docs.transcript,
+                ),
+                slot(
+                  { kind: "ielts", title: "Ảnh chứng chỉ IELTS", accept: "Chấp nhận JPG, PNG, tối đa 8 MB", mimes: "image/jpeg,image/png" },
+                  docs.ielts,
+                ),
+                slot(
+                  {
+                    kind: "identity",
+                    title: "Ảnh CMND/CCCD hoặc hộ chiếu",
+                    accept: "Chấp nhận JPG, PNG, tối đa 8 MB",
+                    mimes: "image/jpeg,image/png",
+                  },
+                  docs.identity,
+                ),
               ]}
             />
           </div>
@@ -65,12 +89,12 @@ export default function PortalPage() {
         </section>
 
         <section className="mt-12 space-y-6">
-          <ExtractedInfo
-            fullName={extracted.fullName}
-            dateOfBirth={extracted.dateOfBirth}
-            gpa={extracted.gpa}
-            ielts={extracted.ielts}
-          />
+          <ExtractedInfo docs={docs} />
+          {gpaNote && (
+            <p className="text-sm text-muted-foreground">
+              Điểm học tập trên bảng điểm không theo thang 10 nên chưa tự đối chiếu được; tư vấn viên sẽ quy đổi giúp bạn.
+            </p>
+          )}
           <SchoolMatch matches={matches} />
         </section>
       </main>

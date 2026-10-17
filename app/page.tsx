@@ -11,6 +11,9 @@ import { FaqSection } from "@/components/landing/faq";
 import { CtaBanner } from "@/components/landing/cta-banner";
 import { ChatWidget } from "@/components/landing/chat-widget";
 
+// Danh sách trường lấy từ Supabase; làm mới tối đa 5 phút một lần
+export const revalidate = 300;
+
 export default function LandingPage() {
   return (
     <>

@@ -1,7 +1,7 @@
 import { Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { School } from "@/lib/mock-data";
+import type { ReferenceSchool as School } from "@/lib/reference-schools";
 
 export function SchoolMatch({ matches }: { matches: { school: School; passed: boolean }[] }) {
   return (
@@ -13,6 +13,11 @@ export function SchoolMatch({ matches }: { matches: { school: School; passed: bo
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        {matches.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Nộp bảng điểm và chứng chỉ IELTS hợp lệ để hệ thống đối chiếu với điểm chuẩn từng trường.
+          </p>
+        )}
         {matches.map(({ school, passed }) => (
           <div
             key={school.id}
@@ -36,7 +41,7 @@ export function SchoolMatch({ matches }: { matches: { school: School; passed: bo
               </div>
             </div>
             <div className="text-right text-sm text-muted-foreground">
-              <p>Yêu cầu GPA ≥ {school.minGpa.toFixed(1)}</p>
+              <p>Điểm học tập ≥ {school.minGpa.toFixed(1)}</p>
               <p>IELTS ≥ {school.minIelts.toFixed(1)}</p>
             </div>
           </div>

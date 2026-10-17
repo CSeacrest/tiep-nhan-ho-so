@@ -57,16 +57,17 @@ export function QuoteForm() {
   return (
     <section id="bao-gia" className="scroll-mt-24 py-16 md:py-24">
       <div className="mx-auto max-w-7xl px-6">
-        <div>
-          <h2 className="text-balance text-3xl font-medium tracking-tight md:text-4xl">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Báo giá</p>
+          <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
             Nhận báo giá dịch vụ ngay
           </h2>
-          <p className="mt-3 max-w-lg text-muted-foreground">
-            Chọn quốc gia, bậc học và gói dịch vụ theo mẫu ở dưới
+          <p className="mt-3 text-muted-foreground">
+            Chọn quốc gia, bậc học và gói dịch vụ theo mẫu ở dưới. Xem báo giá hoàn toàn miễn phí.
           </p>
         </div>
 
-        <Card className="mt-10 p-6 md:p-8">
+        <Card className="mt-10 rounded-3xl p-6 shadow-xl shadow-primary/8 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2">

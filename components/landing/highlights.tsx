@@ -29,25 +29,37 @@ const highlights = [
 
 export function Highlights() {
   return (
-    <section className="py-16 md:py-24">
+    <section id="diem-noi-bat" className="scroll-mt-24 py-16 md:py-24">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="grid gap-10 md:grid-cols-3 md:gap-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Vì sao chọn DuHoc24</p>
+          <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
+            Đơn giản, minh bạch và luôn bên cạnh bạn
+          </h2>
+        </div>
+
+        <div className="mt-12 grid gap-8 md:grid-cols-3">
           {highlights.map(({ icon: Icon, title, description, image }) => (
-            <div key={title}>
-              <div className="relative overflow-hidden rounded-2xl shadow-sm shadow-black/5 ring-1 ring-foreground/6.5">
+            <div
+              key={title}
+              className="group overflow-hidden rounded-3xl bg-card shadow-sm shadow-primary/5 ring-1 ring-border duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
+            >
+              <div className="relative overflow-hidden">
                 <Image
                   src={image}
                   alt={title}
                   width={800}
                   height={600}
-                  className="aspect-4/3 w-full object-cover"
+                  className="aspect-4/3 w-full object-cover duration-500 group-hover:scale-105"
                 />
-                <span className="absolute bottom-3 left-3 flex size-10 items-center justify-center rounded-xl bg-background shadow-sm ring-1 ring-foreground/10">
+                <span className="absolute bottom-3 left-3 flex size-11 items-center justify-center rounded-2xl bg-card text-primary shadow-md ring-1 ring-border">
                   <Icon className="size-5" />
                 </span>
               </div>
-              <h3 className="mt-4 text-lg font-medium">{title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+              <div className="p-6">
+                <h3 className="text-lg font-semibold">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
+              </div>
             </div>
           ))}
         </div>

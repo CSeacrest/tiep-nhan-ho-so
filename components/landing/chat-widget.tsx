@@ -8,54 +8,94 @@ import { cn } from "@/lib/utils";
 interface Message {
   from: "bot" | "user";
   text: string;
+  error?: boolean; // tin báo lỗi của hệ thống: hiển thị cho khách nhưng KHÔNG gửi lại cho AI
 }
 
 const quickQuestions = [
   "Dịch vụ này gồm những gì?",
-  "Bao lâu thì có kết quả xét duyệt?",
+  "Mất bao lâu để có kết quả?",
   "Chi phí dịch vụ là bao nhiêu?",
-  "Tôi cần chuẩn bị giấy tờ gì?",
+  "Cần chuẩn bị giấy tờ gì?",
 ];
 
-const cannedAnswers: Record<string, string> = {
-  "Dịch vụ này gồm những gì?":
-    "Bên mình lo phần đối chiếu điểm chuẩn, kiểm tra hồ sơ và tư vấn chọn trường, chia làm 2 gói: Cơ bản và Toàn diện.",
-  "Bao lâu thì có kết quả xét duyệt?":
-    "Nộp đủ giấy tờ là có kết quả đối chiếu điểm chuẩn ngay. Sau đó tư vấn viên sẽ gọi xác nhận lại với bạn trong vòng 24h.",
-  "Chi phí dịch vụ là bao nhiêu?":
-    "Gói Cơ bản 18.000.000₫, gói Toàn diện 45.000.000₫ nhé. Bạn kéo lên phần báo giá phía trên để xem chi tiết quyền lợi từng gói.",
-  "Tôi cần chuẩn bị giấy tờ gì?":
-    "3 thứ thôi: bảng điểm (PDF), ảnh chứng chỉ IELTS, và ảnh CMND/CCCD hoặc hộ chiếu.",
+const GREETING: Message = {
+  from: "bot",
+  text: "Chào bạn! Mình là trợ lý ảo của DuHoc24, bạn cần hỗ trợ gì về hồ sơ du học?",
 };
 
-const initialMessages: Message[] = [
-  { from: "bot", text: "Chào bạn! Mình là trợ lý ảo của DuHoc24, bạn cần hỗ trợ gì về hồ sơ du học?" },
-];
+const MAX_LENGTH = 500;
+
+// Hội thoại lưu trong bộ nhớ của trang (biến cấp module, chỉ có ở trình duyệt):
+// còn nguyên khi đóng/mở khung chat hoặc chuyển trang trong site, mất khi tải lại trang (F5).
+const session: { messages: Message[]; open: boolean } = { messages: [GREETING], open: false };
 
 export function ChatWidget() {
-  const [open, setOpen] = React.useState(false);
-  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
+  const [open, setOpen] = React.useState(session.open);
+  const [messages, setMessages] = React.useState<Message[]>(session.messages);
   const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const bottomRef = React.useRef<HTMLDivElement>(null);
 
-  function sendMessage(text: string) {
-    if (!text.trim()) return;
-    const answer = cannedAnswers[text];
-    setMessages((prev) => [
-      ...prev,
-      { from: "user", text },
-      ...(answer ? [{ from: "bot" as const, text: answer }] : []),
-    ]);
+  React.useEffect(() => {
+    session.messages = messages;
+    session.open = open;
+  }, [messages, open]);
+
+  // Luôn cuộn xuống tin nhắn mới nhất
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, loading, open]);
+
+  async function sendMessage(raw: string) {
+    const text = raw.trim().slice(0, MAX_LENGTH);
+    if (!text || loading) return;
+
+    const next: Message[] = [...messages, { from: "user", text }];
+    setMessages(next);
     setInput("");
+    setLoading(true);
+
+    try {
+      // Gửi TOÀN BỘ cuộc trò chuyện từ đầu (trừ lời chào mở đầu và tin báo lỗi) để bot nhớ mạch câu chuyện
+      const history = next
+        .slice(1)
+        .filter((m) => !m.error)
+        .map((m) => ({ role: m.from === "user" ? "user" : "assistant", content: m.text }));
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { reply?: string; error?: string };
+
+      const ok = res.ok && !!data.reply;
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: "bot",
+          text: ok ? data.reply! : (data.error ?? "Xin lỗi, có lỗi xảy ra. Bạn thử lại nhé."),
+          error: !ok,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { from: "bot", text: "Không kết nối được. Bạn kiểm tra mạng rồi thử lại nhé.", error: true },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="fixed bottom-5 right-5 z-50">
       {open && (
-        <div className="mb-3 flex h-[28rem] w-80 flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-black/10 ring-1 ring-foreground/6.5 sm:w-96">
+        <div className="mb-3 flex h-[28rem] max-h-[calc(100dvh-7.5rem)] w-80 flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-black/10 ring-1 ring-foreground/6.5 sm:w-96">
           <div className="flex items-center justify-between border-b bg-primary px-4 py-3 text-primary-foreground">
             <div>
               <p className="text-sm font-medium">Hỏi đáp nhanh</p>
-              <p className="text-xs opacity-80">Thường trả lời trong vài phút</p>
+              <p className="text-xs opacity-80">Trợ lý tư vấn du học</p>
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -80,10 +120,24 @@ export function ChatWidget() {
                       : "rounded-bl-sm bg-muted text-foreground",
                   )}
                 >
-                  {m.text}
+                  <span className="whitespace-pre-wrap">{m.text}</span>
                 </div>
               </div>
             ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div
+                  role="status"
+                  aria-label="Trợ lý đang trả lời"
+                  className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-3"
+                >
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
 
           <div className="border-t p-3">
@@ -92,7 +146,8 @@ export function ChatWidget() {
                 <button
                   key={q}
                   onClick={() => sendMessage(q)}
-                  className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground duration-150 hover:border-primary hover:text-primary"
+                  disabled={loading}
+                  className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground duration-150 hover:border-primary hover:text-primary disabled:opacity-50"
                 >
                   {q}
                 </button>
@@ -109,9 +164,10 @@ export function ChatWidget() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Nhập câu hỏi của bạn..."
+                maxLength={MAX_LENGTH}
                 className="h-9 flex-1 rounded-full border border-input bg-transparent px-3.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
-              <Button type="submit" size="icon" className="shrink-0" aria-label="Gửi">
+              <Button type="submit" size="icon" className="shrink-0" aria-label="Gửi" disabled={loading || !input.trim()}>
                 <Send className="size-4" />
               </Button>
             </form>

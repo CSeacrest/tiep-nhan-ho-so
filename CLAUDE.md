@@ -36,6 +36,11 @@ Chưa có test runner nào được cấu hình. Không cần biến môi trư�
   - `/portal` là cổng hồ sơ học viên, ghép từ `components/portal/*`.
   - `/admin/*` dùng chung `app/admin/layout.tsx` (sidebar + nav di động từ `components/admin/`). `/admin` chuyển hướng sang `/admin/requests`; các trang con: `requests`, `schools`, `profiles`, `conversations`.
 - `/login` chưa tồn tại và cố ý để dành cho Tuần 6; `/portal` hiện chưa được bảo vệ.
+- **Chatbot** (`components/landing/chat-widget.tsx` → `app/api/chat/route.ts` → OpenAI): prompt và bộ hỏi–đáp nằm ở `lib/chat-knowledge.ts`. Khoá `OPENAI_API_KEY` chỉ dùng ở server.
+- **Lưu hội thoại vào Supabase:** trình duyệt gửi kèm `visitorId` (UUID ẩn danh giữ trong localStorage) và `conversationId` (mới mỗi lần mở trang). Route dùng `after()` để gọi `saveChatTurn` (`lib/chat-log.ts`, client `createAdminClient` từ `@supabase/server/core`, bỏ qua RLS) ghi vào `chat_conversations` / `chat_messages`; lỗi ghi DB chỉ log, không làm hỏng chat. Bảng tạo bằng `supabase/schema.sql` (chạy tay trong SQL Editor; RLS bật, không có policy nên trình duyệt không đọc/ghi được).
+- `/admin/conversations` đọc dữ liệu thật từ Supabase (server component, `force-dynamic`). Các trang admin khác vẫn dùng mock.
+- **`proxy.ts`** bảo vệ `/admin/*` bằng HTTP Basic Auth (`ADMIN_PASSWORD`, tuỳ chọn `ADMIN_USER`). Production mà chưa đặt `ADMIN_PASSWORD` thì trả 503; dev thì cho qua. Là lớp tạm cho tới khi có đăng nhập thật ở Tuần 6.
+- Next.js 16 dùng `proxy.ts` (thay cho `middleware.ts`).
 
 ## Quy ước
 

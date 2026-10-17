@@ -27,7 +27,40 @@ const MAX_LENGTH = 500;
 
 // Hội thoại lưu trong bộ nhớ của trang (biến cấp module, chỉ có ở trình duyệt):
 // còn nguyên khi đóng/mở khung chat hoặc chuyển trang trong site, mất khi tải lại trang (F5).
-const session: { messages: Message[]; open: boolean } = { messages: [GREETING], open: false };
+const session: { messages: Message[]; open: boolean; conversationId: string | null } = {
+  messages: [GREETING],
+  open: false,
+  conversationId: null, // mỗi lần mở trang (F5) là một cuộc hội thoại mới
+};
+
+// UUID v4. crypto.randomUUID chỉ có trên HTTPS/localhost nên có phương án dự phòng (ví dụ mở bằng IP LAN qua http).
+function uuid(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+// ID ẩn danh riêng của từng khách (từng trình duyệt), giữ lại giữa các lần truy cập.
+// Không chứa thông tin cá nhân; xoá dữ liệu trình duyệt thì sẽ có ID mới.
+const VISITOR_KEY = "duhoc24_visitor_id";
+let visitorFallback: string | null = null;
+
+function getVisitorId(): string {
+  try {
+    let id = localStorage.getItem(VISITOR_KEY);
+    if (!id) {
+      id = uuid();
+      localStorage.setItem(VISITOR_KEY, id);
+    }
+    return id;
+  } catch {
+    // Trình duyệt chặn localStorage: dùng ID tạm trong phiên
+    return (visitorFallback ??= uuid());
+  }
+}
 
 export function ChatWidget() {
   const [open, setOpen] = React.useState(session.open);
@@ -62,10 +95,16 @@ export function ChatWidget() {
         .filter((m) => !m.error)
         .map((m) => ({ role: m.from === "user" ? "user" : "assistant", content: m.text }));
 
+      session.conversationId ??= uuid();
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          visitorId: getVisitorId(),
+          conversationId: session.conversationId,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { reply?: string; error?: string };
 
@@ -171,6 +210,10 @@ export function ChatWidget() {
                 <Send className="size-4" />
               </Button>
             </form>
+            <p className="px-1 pt-2 text-[11px] leading-snug text-muted-foreground">
+              Cuộc trò chuyện được lưu để đội ngũ tư vấn hỗ trợ bạn tốt hơn. Vui lòng không gửi mật khẩu hay thông tin
+              thẻ.
+            </p>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { buildSystemPrompt } from "@/lib/chat-knowledge";
+import { UUID_RE, saveChatTurn } from "@/lib/chat-log";
 
 // Chạy phía server: OPENAI_API_KEY không bao giờ được gửi xuống trình duyệt.
 export const runtime = "nodejs";
@@ -72,6 +73,14 @@ export async function POST(request: NextRequest) {
   const messages = parseMessages(body);
   if (!messages) return fail(400, "Yêu cầu không hợp lệ.");
 
+  // ID ẩn danh của khách (theo trình duyệt) và ID cuộc hội thoại (theo lần mở trang) để lưu vào Supabase.
+  // Thiếu hoặc sai định dạng thì vẫn trả lời bình thường, chỉ là không lưu.
+  const ids = body as { visitorId?: unknown; conversationId?: unknown };
+  const visitorId = typeof ids.visitorId === "string" && UUID_RE.test(ids.visitorId) ? ids.visitorId.toLowerCase() : null;
+  const conversationId =
+    typeof ids.conversationId === "string" && UUID_RE.test(ids.conversationId) ? ids.conversationId.toLowerCase() : null;
+  const askedAt = new Date();
+
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -95,6 +104,13 @@ export async function POST(request: NextRequest) {
     const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
     const reply = data.choices?.[0]?.message?.content?.trim();
     if (!reply) return fail(502, "Xin lỗi, mình chưa trả lời được lúc này. Bạn thử lại nhé.");
+
+    // Lưu hội thoại sau khi đã gửi câu trả lời, không làm chậm khách
+    if (visitorId && conversationId) {
+      const userText = messages[messages.length - 1].content;
+      const userAgent = request.headers.get("user-agent");
+      after(() => saveChatTurn({ conversationId, visitorId, userText, reply, userAgent, askedAt }));
+    }
 
     return Response.json({ reply });
   } catch (err) {

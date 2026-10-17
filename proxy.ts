@@ -48,13 +48,19 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return new NextResponse("Cần đăng nhập để vào trang quản trị.", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="DuHoc24 Admin", charset="UTF-8"',
-      "Content-Type": "text/plain; charset=utf-8",
-    },
-  });
+  // Chỉ bật hộp thoại đăng nhập của trình duyệt khi NGƯỜI DÙNG THẬT điều hướng tới trang.
+  // Các yêu cầu nền (Next prefetch, RSC, fetch từ trang khác) vẫn bị từ chối 401 nhưng KHÔNG kèm
+  // WWW-Authenticate, để không làm hiện hộp thoại bất ngờ khi đang ở trang chủ.
+  const mode = request.headers.get("sec-fetch-mode");
+  const isBackground =
+    request.headers.has("next-router-prefetch") ||
+    request.headers.has("rsc") ||
+    (mode !== null && mode !== "navigate");
+
+  const headers: Record<string, string> = { "Content-Type": "text/plain; charset=utf-8" };
+  if (!isBackground) headers["WWW-Authenticate"] = 'Basic realm="DuHoc24 Admin", charset="UTF-8"';
+
+  return new NextResponse("Cần đăng nhập để vào trang quản trị.", { status: 401, headers });
 }
 
 export const config = {

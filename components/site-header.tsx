@@ -17,6 +17,10 @@ const menuItems = [
   { name: "Admin", href: "/admin" },
 ];
 
+// Khu /admin có mật khẩu: KHÔNG được prefetch từ trang công khai, nếu không yêu cầu tải trước sẽ nhận 401
+// và trình duyệt hiện hộp thoại đăng nhập ngay ở trang chủ. (undefined = giữ hành vi prefetch mặc định)
+const noPrefetch = (href: string) => (href.startsWith("/admin") ? false : undefined);
+
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const pathname = usePathname();
@@ -36,6 +40,7 @@ export function SiteHeader() {
                 <li key={item.name}>
                   <Link
                     href={item.href}
+                    prefetch={noPrefetch(item.href)}
                     className={cn(
                       "block duration-150 hover:text-primary",
                       active ? "font-semibold text-primary" : "text-muted-foreground",
@@ -73,6 +78,7 @@ export function SiteHeader() {
                 <li key={item.name}>
                   <Link
                     href={item.href}
+                    prefetch={noPrefetch(item.href)}
                     onClick={() => setMenuOpen(false)}
                     className={cn(
                       "block rounded-xl px-3 py-2.5 text-base duration-150",
